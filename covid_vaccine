@@ -157,6 +157,8 @@ having max(people_vaccinated) is not null
 	and population is not null
 order by vaccines_on_population desc
 ;
+
+
 -- ulalah, let's check my new table
 select * from covid.vaccine_density;
 
