@@ -1,0 +1,172 @@
+CREATE TABLE covid.vaccine
+(
+	iso_code text,
+	continent text,
+	location text,
+	date date,
+	new_tests real,
+	total_tests real,
+	total_tests_per_thousand real,
+	new_tests_per_thousand real,
+	new_tests_smoothed real,
+	new_tests_smoothed_per_thousand real,
+	positive_rate real,
+	tests_per_case real,
+	tests_units real,
+	total_vaccinations real,
+	people_vaccinated real,
+	people_fully_vaccinated real,
+	total_boosters real,
+	new_vaccinations real,
+	new_vaccinations_smoothed real,
+	total_vaccinations_per_hundred real,
+	people_vaccinated_per_hundred real,
+	people_fully_vaccinated_per_hundred real,
+	total_boosters_per_hundred real,
+	new_vaccinations_smoothed_per_million real,
+	stringency_index real,
+	population_density real,
+	median_age real,
+	aged_65_older real,
+	aged_70_older real,
+	gdp_per_capita real,
+	extreme_poverty real,
+	cardiovasc_death_rate real,
+	diabetes_prevalence real,
+	female_smokers real,
+	male_smokers real,
+	handwashing_facilities real,
+	hospital_beds_per_thousand real,
+	life_expectancy real,
+	human_development_index real,
+	excess_mortality real
+);
+
+alter table covid.vaccine
+alter column tests_units type text;
+
+alter table
+
+select * from covid.vaccine;
+
+-- check the value of continent and location
+select distinct continent, location 
+	from covid.vaccine
+where continent is null; -- the same with death data that there are some null value in column continent whilst the locations are continent
+
+-- generally looking for the data tests
+select location, date, new_tests
+	from covid.vaccine
+where continent is not null
+order by location, date;
+
+-- it seems there are miss values of test in some countries, let check which ones?
+select location, sum(total_tests)
+	from covid.vaccine
+where continent is not null
+group by location
+having sum(total_tests) is null
+order by location;
+
+-- BE CAREFUL! The test_unit is different *cry*. Let see it first to see how we could dominate.
+select distinct tests_units, count(tests_units)
+	from covid.vaccine
+group by tests_units; -- I don't know how to figure out the way of measurement base on this difference so I decide to consider the unit as one for the following queries.
+
+-- find the last updated data of tests
+select location, max(total_tests) as total_no_test
+	from covid.vaccine
+where continent is not null
+group by location
+having max(total_tests) is not null
+order by total_no_test desc;
+
+-- find the test density on population
+select location, max(total_tests) as total_no_test, population, 
+		(max(total_tests)/population)*100 as test_density
+	from 
+		(select v.location, v.total_tests, d.population, v.continent
+			from covid.death as d
+		right join covid.vaccine as v
+			on d.location = v.location
+			and d.date = v.date) as joined_table
+where continent is not null
+group by location, population
+having max(total_tests) is not null
+order by test_density desc;
+
+-- looking for the number of vaccine
+-- there are 2 indicators for #vaccine. let's check how its difference.
+select location, date, total_vaccinations, people_vaccinated
+	from covid.vaccine
+where date between '2021-01-01' and '2021-08-20'
+	and total_vaccinations < people_vaccinated
+order by location, date;
+
+-- the indicator that more exact about effective vaccine is people vaccinated
+-- check the lasted updated number on 20/8/21
+select continent, location, max(people_vaccinated) as effective_vaccinations
+	from covid.vaccine
+where continent is not null
+group by continent, location
+having max(people_vaccinated) is not null
+order by effective_vaccinations desc;
+
+-- let's dig down to Asia
+select continent, location, max(people_vaccinated) as effective_vaccinations
+	from covid.vaccine
+where continent = 'Asia'
+group by continent, location
+having max(people_vaccinated) is not null
+order by effective_vaccinations desc;
+
+-- because of the difference of vaccine density, I am curious about the speed of vaccinating in countries.
+-- then comparing it to the density in order to evaluate the effect of vaccination strategy. 
+create view vaccinated_time as
+select v1.location, v1.date, 
+		date_part('day','2021-08-20'::timestamp - v1.date::timestamp) as duration
+	from covid.vaccine v1
+join 
+		(select location, min(people_vaccinated) as first_vaccine
+			from covid.vaccine 
+		group by location) as v2
+	on v1.location = v2.location
+	and v1.people_vaccinated = v2.first_vaccine
+order by duration desc;
+
+-- check the number of effective vaccinations density on population and create table for later visualizations
+create table covid.vaccine_density
+	(continent text,
+	 location text,
+	 effective_vaccinations numeric,
+	 population numeric,
+	 vaccine_on_population numeric);
+	
+insert into covid.vaccine_density
+select continent, location, max(people_vaccinated) as effective_vaccinations, population, 
+		round(cast((max(people_vaccinated)/population)*100 as numeric),2) as vaccines_on_population
+	from
+		(select v.continent, v.location, v.people_vaccinated, d.population
+		 	from covid.vaccine as v
+		join covid.death as d
+		on d.location = v.location
+		and d.date = v.date) as joined_table
+where continent is not null
+group by continent, location, population
+having max(people_vaccinated) is not null
+	and population is not null
+order by vaccines_on_population desc
+;
+-- ulalah, let's check my new table
+select * from covid.vaccine_density;
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,115 @@
+CREATE TABLE covid.death
+(
+	iso_code text,
+ 	continent text,
+	location text,
+	date date,
+	population int,
+	total_cases int,
+	new_cases int,
+	new_cases_smoothed real,
+	total_deaths int,
+	new_deaths int,
+	new_deaths_smoothed real,
+	total_cases_per_million real,
+	new_cases_per_million real,
+	new_cases_smoothed_per_million real,
+	total_deaths_per_million real,
+	new_deaths_per_million real,
+	new_deaths_smoothed_per_million real,
+	reproduction_rate real,
+	icu_patients real,
+	icu_patients_per_million real,
+	hosp_patients real,
+	hosp_patients_per_million real,
+	weekly_icu_admissions real,
+	weekly_icu_admissions_per_million real,
+	weekly_hosp_admissions real,
+	weekly_hosp_admissions_per_million real
+)
+
+ALTER TABLE covid.death
+ALTER COLUMN population TYPE real,
+ALTER COLUMN total_cases TYPE real,
+ALTER COLUMN total_deaths TYPE real;
+
+ALTER TABLE covid.death
+ALTER COLUMN new_cases TYPE real,
+ALTER COLUMN new_deaths TYPE real;
+
+ALTER TABLE covid.death
+ALTER COLUMN population TYPE decimal;
+
+SELECT * FROM covid.death;
+
+-- 1. check how many continents are reported
+select distinct continent from covid.death;
+-- there is null -> check what is null
+select * from covid.death
+where continent is null; -- there are codes that not have continent but have location as continent -> concern. 
+
+-- check how many countries are reported
+select distinct continent, location from covid.death
+order by continent;
+
+-- check population 
+select distinct location, population from covid.death
+where population is not null
+	and continent is not null
+order by population desc;
+
+-- check the duration of data
+select distinct date from covid.death
+order by date; -- from 1/1/2020 to 20/8/2020
+
+-- select data going to be used
+select continent, location, date, total_cases, new_cases, total_deaths, new_deaths, population
+from covid.death
+order by 1,2,3;
+
+alter table covid.death
+drop column death_case_ratio;
+
+-- 2. About Number of Cases:
+-- looking for the last updated total cases
+select continent, location, total_cases
+from covid.death
+where date = '2021-08-20' and continent is not null
+order by total_cases desc;
+
+-- looking for the ration of total deaths over total cases
+select continent, location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 as death_case_per
+from covid.death
+where continent is not null
+	and location = 'Vietnam'
+order by continent, location, date;
+
+-- looking for new cases data
+select continent, location, date, new_cases, (new_cases/population)*100
+from covid.death
+where continent is not null
+	and location = 'Vietnam'
+order by continent, location, date;
+
+-- looking for countries having Highest Infection Rate compare to population
+select location, population, max(total_cases) as Highest_cases, (max(total_cases)/population)*100 as Infection_Rate
+from covid.death
+group by location, population
+having location = 'Indonesia'
+order by Infection_Rate desc;
+
+
+-- 3. About Number of Death: check the highest death
+select location, max(cast(total_deaths as int)) as Highest_Death
+from covid.death
+group by location, continent
+having continent is not null 
+	and max(cast(total_deaths as int)) is not null
+order by highest_death desc;
+
+-- check the highest death in the terms of continent
+select location, max(cast(total_deaths as int)) as Highest_Death
+from covid.death
+group by location, continent
+having continent is null 
+order by highest_death desc;
